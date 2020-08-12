@@ -14,10 +14,16 @@ class ViewController: UITableViewController {
     
     var items = ["Học IOS","Học Tiếng Anh","Tập Cardio","Ngủ Sớm"]
     
+    let defaults = UserDefaults()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // Do any additional setup after loading the view.
+        if let items = defaults.array(forKey: "ToDoeyList") as? [String] {
+            self.items = items
+        }
+        
     }
     
     
@@ -30,8 +36,6 @@ class ViewController: UITableViewController {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
         cell.textLabel?.text = items[indexPath.item]
-        
-        
         return cell
         
     }
@@ -68,9 +72,9 @@ class ViewController: UITableViewController {
                     self.items.append(textField.text!)
                 }
             }
+            self.defaults.set(self.items, forKey: "ToDoeyList")
             self.tableView.reloadData()
         }
-        
         alert.addAction(action)
         present(alert, animated: true ,completion: nil)
     }
