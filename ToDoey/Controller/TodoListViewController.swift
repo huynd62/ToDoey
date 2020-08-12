@@ -10,20 +10,42 @@ import UIKit
 
 class ViewController: UITableViewController {
     
+    let defaults = UserDefaults.standard
+    var items:[Item] = [Item("Học IOS",false),
+                        Item("Học Tiếng Anh",false),
+                        Item("Tập Cardio",false),
+                        Item("Ngủ Sớm",false)
+    ]
     
     
-    var items = ["Học IOS","Học Tiếng Anh","Tập Cardio","Ngủ Sớm"]
-    
-    let defaults = UserDefaults()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // Do any additional setup after loading the view.
-        if let items = defaults.array(forKey: "ToDoeyList") as? [String] {
-            self.items = items
-        }
+//        do{
+//            if let decoded = defaults.object(forKey: "ToDoListModel") as? Data {
+//                if let Bitems = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [Item.self], from: decoded) as? [Item] {
+//                    self.items = Bitems
+//                }
+//            }
+//        }catch(let error){
+//            print(error.localizedDescription)
+//        }
         
+        
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        print(#function)
+//        self.saveData()
+        
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        print(#function)
+//        self.saveData()
     }
     
     
@@ -35,18 +57,22 @@ class ViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        cell.textLabel?.text = items[indexPath.item]
+        let item  = items[indexPath.item]
+        cell.textLabel?.text = item.title
+        cell.accessoryType =  item.done == true ?  .checkmark:.none
         return cell
         
     }
     
     //MARK:- TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        print(items[indexPath.item])
+        let item = items[indexPath.item]
+        item.done = !item.done!
+        //uncheck
         if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
             tableView.cellForRow(at: indexPath)?.accessoryType = .none
-            
         }else{
+        //check
             tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
         }
         
@@ -54,7 +80,7 @@ class ViewController: UITableViewController {
         
         
     }
-        
+    
     //MARK:- Add new Item
     
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
@@ -69,15 +95,25 @@ class ViewController: UITableViewController {
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             if let safetextFields = alert.textFields{
                 for textField in safetextFields {
-                    self.items.append(textField.text!)
+                    self.items.append(Item(textField.text!,false))
                 }
             }
-            self.defaults.set(self.items, forKey: "ToDoeyList")
+//            self.saveData()
             self.tableView.reloadData()
         }
         alert.addAction(action)
         present(alert, animated: true ,completion: nil)
     }
+    //MARK:- save
+//    func saveData(){
+//        do{
+//            let itemAsData = try NSKeyedArchiver.archivedData(withRootObject: self.items, requiringSecureCoding: true)
+//            self.defaults.set(itemAsData, forKey: "ToDoListModel")
+//            self.defaults.synchronize()
+//        }catch(let error){
+//            print(error.localizedDescription)
+//        }
+//    }
     
 }
 
