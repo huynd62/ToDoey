@@ -12,7 +12,7 @@ class ViewController: UITableViewController {
     
     
     
-    let items = ["Học IOS","Học Tiếng Anh","Tập Cardio","Ngủ Sớm"]
+    var items = ["Học IOS","Học Tiếng Anh","Tập Cardio","Ngủ Sớm"]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -51,6 +51,30 @@ class ViewController: UITableViewController {
         
     }
         
+    //MARK:- Add new Item
+    
+    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+        
+        let alert = UIAlertController(title: "Add New ToDoey", message: "", preferredStyle: .alert)
+        
+        
+        alert.addTextField(configurationHandler:{
+            (alertTextField) in
+            alertTextField.placeholder = "Create new ToDoey"
+        })
+        let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
+            if let safetextFields = alert.textFields{
+                for textField in safetextFields {
+                    self.items.append(textField.text!)
+                }
+            }
+            self.tableView.reloadData()
+        }
+        
+        alert.addAction(action)
+        present(alert, animated: true ,completion: nil)
+    }
+    
 }
 
 
