@@ -8,44 +8,53 @@
 
 import UIKit
 
-class ViewController: UITableViewController {
+class ViewController: UITableViewController,UIGestureRecognizerDelegate {
     
-    let defaults = UserDefaults.standard
-    var items:[Item] = [Item("Học IOS",false),
-                        Item("Học Tiếng Anh",false),
-                        Item("Tập Cardio",false),
-                        Item("Ngủ Sớm",false)
-    ]
+    
+    var items:[Item] = []
+    
+    let dataFilePath = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask)
+        .first?
+        .appendingPathComponent("Items.plist")
+    
+    
     
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Do any additional setup after loading the view.
-//        do{
-//            if let decoded = defaults.object(forKey: "ToDoListModel") as? Data {
-//                if let Bitems = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [Item.self], from: decoded) as? [Item] {
-//                    self.items = Bitems
-//                }
-//            }
-//        }catch(let error){
-//            print(error.localizedDescription)
-//        }
-        
+        loadItems()
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPressAction))
+        longPress.minimumPressDuration = 1
+        longPress.delegate = self
+        self.tableView.addGestureRecognizer(longPress)
         
     }
     
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        print(#function)
-//        self.saveData()
-        
+    
+    //MARK:- longPressAction
+    @objc func longPressAction(longPressGesture:UIGestureRecognizer){
+        let loc = longPressGesture.location(in: self.tableView)
+        if let indexPath = self.tableView.indexPathForRow(at: loc){
+            print(self.items[indexPath.item].title)
+        }else{
+            print("This is not a row")
+        }
     }
     
-    override func viewDidDisappear(_ animated: Bool) {
-        print(#function)
-//        self.saveData()
+    //MARK:- loadItems
+    func loadItems(){
+        if let data  = try? Data(contentsOf: dataFilePath!) {
+            let decoder = PropertyListDecoder()
+            do{
+                self.items = try decoder.decode([Item].self, from: data)
+            }catch(let error){
+                print(error)
+            }
+        }else{
+            print("There was an error when loading data")
+        }
     }
     
     
@@ -63,23 +72,22 @@ class ViewController: UITableViewController {
         return cell
         
     }
-    
     //MARK:- TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let item = items[indexPath.item]
-        item.done = !item.done!
+        item.done = !item.done
         //uncheck
         if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
             tableView.cellForRow(at: indexPath)?.accessoryType = .none
         }else{
-        //check
+            //check
             tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
         }
-        
+        saveData()
         tableView.deselectRow(at: indexPath, animated: true)
         
-        
     }
+    
     
     //MARK:- Add new Item
     
@@ -98,22 +106,22 @@ class ViewController: UITableViewController {
                     self.items.append(Item(textField.text!,false))
                 }
             }
-//            self.saveData()
-            self.tableView.reloadData()
+            self.saveData()
         }
         alert.addAction(action)
         present(alert, animated: true ,completion: nil)
     }
     //MARK:- save
-//    func saveData(){
-//        do{
-//            let itemAsData = try NSKeyedArchiver.archivedData(withRootObject: self.items, requiringSecureCoding: true)
-//            self.defaults.set(itemAsData, forKey: "ToDoListModel")
-//            self.defaults.synchronize()
-//        }catch(let error){
-//            print(error.localizedDescription)
-//        }
-//    }
+    func saveData(){
+        let encoder = PropertyListEncoder()
+        do{
+            let data = try encoder.encode(self.items)
+            try data.write(to:self.dataFilePath!)
+            tableView.reloadData()
+        }catch(let error){
+            print(error.localizedDescription)
+        }
+    }
     
 }
 

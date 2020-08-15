@@ -8,24 +8,13 @@
 
 import UIKit
 
-class Item: NSObject, NSCoding{
+class Item:Codable{
     
-    let title:String?
-    var done:Bool?
+    var title:String = ""
+    var done:Bool = false
     
     init(_ title:String,_ done:Bool) {
         self.title = title
         self.done = done
     }
-    
-    func encode(with coder: NSCoder) {
-        coder.encode(title,forKey: "title")
-        coder.encode(done,forKey: "done")
-    }
-    
-    required convenience init?(coder: NSCoder) {
-        let title = coder.decodeObject(forKey: "title") as! String
-        let done = coder.decodeBool(forKey: "done")
-        self.init(title,done)
-     }
 }
