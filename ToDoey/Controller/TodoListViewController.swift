@@ -7,20 +7,13 @@
 //
 
 import UIKit
+import CoreData
 
 class ViewController: UITableViewController,UIGestureRecognizerDelegate {
     
-    
     var items:[Item] = []
     
-    let dataFilePath = FileManager.default
-        .urls(for: .documentDirectory, in: .userDomainMask)
-        .first?
-        .appendingPathComponent("Items.plist")
-    
-    
-    
-    
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -29,34 +22,49 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         longPress.minimumPressDuration = 1
         longPress.delegate = self
         self.tableView.addGestureRecognizer(longPress)
-        
     }
-    
     
     //MARK:- longPressAction
     @objc func longPressAction(longPressGesture:UIGestureRecognizer){
         let loc = longPressGesture.location(in: self.tableView)
+        var titleTextField = UITextField()
         if let indexPath = self.tableView.indexPathForRow(at: loc){
-            print(self.items[indexPath.item].title)
+            print(self.items[indexPath.item].title!)
+            
+            let alert = UIAlertController(title: "Change title", message: "", preferredStyle: .alert)
+            alert.addTextField { (textField) in
+                textField.placeholder = "Change Title"
+                titleTextField = textField
+            }
+ 
+            let action = UIAlertAction(title: "Change Title of row \(indexPath.row)", style: .default) { (action) in
+                self.items[indexPath.item].title = titleTextField.text!
+                self.saveData()
+                print("change completed")
+                
+            }
+            
+            alert.addAction(action)
+            present(alert, animated: true ,completion: nil)
+            
         }else{
             print("This is not a row")
         }
     }
     
     //MARK:- loadItems
-    func loadItems(){
-        if let data  = try? Data(contentsOf: dataFilePath!) {
-            let decoder = PropertyListDecoder()
-            do{
-                self.items = try decoder.decode([Item].self, from: data)
-            }catch(let error){
-                print(error)
-            }
-        }else{
-            print("There was an error when loading data")
+    func loadItems(with request:NSFetchRequest<Item> = Item.fetchRequest()){
+        do{
+            request.fetchLimit = 100
+            //            request.predicate = NSPredicate(format: "title like %@","Đánh Duy")
+            request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+            items = try context.fetch(request)
+            tableView.reloadData()
+        }catch(let error){
+            print(error)
         }
+        
     }
-    
     
     //MARK:- TableView DataSource's methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -72,6 +80,7 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         return cell
         
     }
+    
     //MARK:- TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let item = items[indexPath.item]
@@ -88,9 +97,7 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         
     }
     
-    
     //MARK:- Add new Item
-    
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         
         let alert = UIAlertController(title: "Add New ToDoey", message: "", preferredStyle: .alert)
@@ -103,7 +110,12 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             if let safetextFields = alert.textFields{
                 for textField in safetextFields {
-                    self.items.append(Item(textField.text!,false))
+                    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+                    
+                    let newItem = Item(context: context)
+                    newItem.title = textField.text
+                    newItem.done = false
+                    self.items.append(newItem)
                 }
             }
             self.saveData()
@@ -111,18 +123,39 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         alert.addAction(action)
         present(alert, animated: true ,completion: nil)
     }
+    
     //MARK:- save
     func saveData(){
-        let encoder = PropertyListEncoder()
         do{
-            let data = try encoder.encode(self.items)
-            try data.write(to:self.dataFilePath!)
+            try context.save()
             tableView.reloadData()
         }catch(let error){
             print(error.localizedDescription)
         }
     }
     
+}
+//MARK:- UISearchBarDelegate
+extension ViewController:UISearchBarDelegate{
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request:NSFetchRequest<Item> = Item.fetchRequest()
+        let searchWord = searchBar.text!
+        request.predicate = NSPredicate(format: "title contains[cd] %@", searchWord)
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        self.loadItems(with: request)
+        
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0{
+            loadItems()
+            
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+                searchBar.resignFirstResponder()
+            }
+        }
+    }
 }
 
 
