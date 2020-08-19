@@ -13,11 +13,17 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
     
     var items:[Item] = []
     
+    var selectedCategory:Category? {
+        didSet{
+                loadItems()
+            }
+        }
+    
+    
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        loadItems()
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPressAction))
         longPress.minimumPressDuration = 1
         longPress.delegate = self
@@ -36,7 +42,7 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
                 textField.placeholder = "Change Title"
                 titleTextField = textField
             }
- 
+            
             let action = UIAlertAction(title: "Change Title of row \(indexPath.row)", style: .default) { (action) in
                 self.items[indexPath.item].title = titleTextField.text!
                 self.saveData()
@@ -53,11 +59,17 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
     }
     
     //MARK:- loadItems
-    func loadItems(with request:NSFetchRequest<Item> = Item.fetchRequest()){
+    func loadItems(with request:NSFetchRequest<Item> = Item.fetchRequest(),addPredicate:NSPredicate? = nil){
         do{
             request.fetchLimit = 100
-            //            request.predicate = NSPredicate(format: "title like %@","Đánh Duy")
             request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+            let defaultPredicate = NSPredicate(format: "parentCategory.name matches[cd] %@", selectedCategory!.name!)
+            if let additionPredicate = addPredicate {
+                let combinedPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [defaultPredicate,additionPredicate])
+                request.predicate = combinedPredicate
+            }else{
+                request.predicate = defaultPredicate
+            }
             items = try context.fetch(request)
             tableView.reloadData()
         }catch(let error){
@@ -115,6 +127,7 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
                     let newItem = Item(context: context)
                     newItem.title = textField.text
                     newItem.done = false
+                    newItem.parentCategory = self.selectedCategory
                     self.items.append(newItem)
                 }
             }
@@ -138,18 +151,16 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
 //MARK:- UISearchBarDelegate
 extension ViewController:UISearchBarDelegate{
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        print("fuck")
         let request:NSFetchRequest<Item> = Item.fetchRequest()
         let searchWord = searchBar.text!
-        request.predicate = NSPredicate(format: "title contains[cd] %@", searchWord)
-        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-        self.loadItems(with: request)
-        
+        let addPredicate = NSPredicate(format: "title contains[cd] %@", searchWord)
+        self.loadItems(with: request,addPredicate: addPredicate)
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchBar.text?.count == 0{
             loadItems()
-            
             DispatchQueue.main.async {
                 self.tableView.reloadData()
                 searchBar.resignFirstResponder()
