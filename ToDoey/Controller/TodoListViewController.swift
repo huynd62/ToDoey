@@ -7,20 +7,21 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class ViewController: UITableViewController,UIGestureRecognizerDelegate {
     
-    var items:[Item] = []
+    
+    let realm = try! Realm()
+    
+    var items:Results<Item>?
     
     var selectedCategory:Category? {
         didSet{
-                loadItems()
-            }
+            loadItems()
         }
+    }
     
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -28,6 +29,7 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         longPress.minimumPressDuration = 1
         longPress.delegate = self
         self.tableView.addGestureRecognizer(longPress)
+        tableView.reloadData()
     }
     
     //MARK:- longPressAction
@@ -35,19 +37,21 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         let loc = longPressGesture.location(in: self.tableView)
         var titleTextField = UITextField()
         if let indexPath = self.tableView.indexPathForRow(at: loc){
-            print(self.items[indexPath.item].title!)
-            
             let alert = UIAlertController(title: "Change title", message: "", preferredStyle: .alert)
             alert.addTextField { (textField) in
                 textField.placeholder = "Change Title"
                 titleTextField = textField
             }
             
-            let action = UIAlertAction(title: "Change Title of row \(indexPath.row)", style: .default) { (action) in
-                self.items[indexPath.item].title = titleTextField.text!
-                self.saveData()
-                print("change completed")
-                
+            let action = UIAlertAction(title: "Change title of row this items", style: .default) { (action) in
+                do{
+                try self.realm.write{
+                    self.items?[indexPath.item].title = titleTextField.text!
+                    }
+                }catch(let error){
+                    print(error)
+                }
+                self.tableView.reloadData()
             }
             
             alert.addAction(action)
@@ -59,52 +63,55 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
     }
     
     //MARK:- loadItems
-    func loadItems(with request:NSFetchRequest<Item> = Item.fetchRequest(),addPredicate:NSPredicate? = nil){
-        do{
-            request.fetchLimit = 100
-            request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-            let defaultPredicate = NSPredicate(format: "parentCategory.name matches[cd] %@", selectedCategory!.name!)
-            if let additionPredicate = addPredicate {
-                let combinedPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [defaultPredicate,additionPredicate])
-                request.predicate = combinedPredicate
-            }else{
-                request.predicate = defaultPredicate
-            }
-            items = try context.fetch(request)
-            tableView.reloadData()
-        }catch(let error){
-            print(error)
+    func loadItems(with item:String? = nil){
+        if item == nil{
+            items = selectedCategory?.items.sorted(byKeyPath: "dateCreated", ascending: true)
+        }else{
+            items = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true).filter("title contains[cd] %@", item!)
         }
-        
+        DispatchQueue.main.async {
+            self.tableView.reloadData()
+        }
     }
     
     //MARK:- TableView DataSource's methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return items.count
+        return items?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        let item  = items[indexPath.item]
-        cell.textLabel?.text = item.title
-        cell.accessoryType =  item.done == true ?  .checkmark:.none
+        if let item  = items?[indexPath.row]{
+            cell.textLabel?.text = item.title
+            cell.accessoryType =  item.done == true ?  .checkmark:.none
+        }else{
+            cell.textLabel?.text = "No item added"
+        }
         return cell
         
     }
     
     //MARK:- TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let item = items[indexPath.item]
-        item.done = !item.done
-        //uncheck
-        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        }else{
-            //check
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
+        do{
+            try realm.write{
+                let item = items?[indexPath.item]
+                item!.done = !item!.done
+            }
+            
+        }catch(let error){
+            print(error)
         }
-        saveData()
+        DispatchQueue.main.async {
+            //uncheck
+            if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
+                tableView.cellForRow(at: indexPath)?.accessoryType = .none
+            }else{
+                //check
+                tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
+            }
+        }
         tableView.deselectRow(at: indexPath, animated: true)
         
     }
@@ -122,25 +129,27 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             if let safetextFields = alert.textFields{
                 for textField in safetextFields {
-                    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-                    
-                    let newItem = Item(context: context)
-                    newItem.title = textField.text
+                    let newItem = Item()
+                    newItem.title = textField.text!
                     newItem.done = false
-                    newItem.parentCategory = self.selectedCategory
-                    self.items.append(newItem)
+                    newItem.dateCreated = Date()
+                    self.save(item: newItem)
                 }
             }
-            self.saveData()
+            self.tableView.reloadData()
         }
         alert.addAction(action)
         present(alert, animated: true ,completion: nil)
     }
     
+    
     //MARK:- save
-    func saveData(){
+    func save(item:Object){
         do{
-            try context.save()
+            try realm.write{
+                realm.add(item)
+                selectedCategory!.items.append(item as! Item)
+            }
             tableView.reloadData()
         }catch(let error){
             print(error.localizedDescription)
@@ -151,11 +160,8 @@ class ViewController: UITableViewController,UIGestureRecognizerDelegate {
 //MARK:- UISearchBarDelegate
 extension ViewController:UISearchBarDelegate{
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        print("fuck")
-        let request:NSFetchRequest<Item> = Item.fetchRequest()
-        let searchWord = searchBar.text!
-        let addPredicate = NSPredicate(format: "title contains[cd] %@", searchWord)
-        self.loadItems(with: request,addPredicate: addPredicate)
+        let searchWord = searchBar.text
+        loadItems(with:searchWord)
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {

@@ -7,37 +7,33 @@
 //
 
 import UIKit
-import CoreData
+
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
     
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    var category:[Category] = []
+    
+    let realm = try! Realm()
+    var category:Results<Category>?
     override func viewDidLoad() {
         super.viewDidLoad()
         loadData()
-        tableView.reloadData()
     }
     //MARK:- loadData
-    func loadData(with request:NSFetchRequest<Category> = Category.fetchRequest()){
-        do {
-            let context = self.context
-            request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
-            category = try context.fetch(request)
-            tableView.reloadData()
-        }catch(let error){
-            print(error)
+    func loadData(with categor:String? = nil){
+        if categor == nil{
+            category = realm.objects(Category.self)
+        }else{
+            category = realm.objects(Category.self).filter("name contains[cd] %@", categor!)
         }
+        tableView.reloadData()
+        
     }
     
     // MARK: - Table view data source
-    //    override func numberOfSections(in tableView: UITableView) -> Int {
-    //        return 2
-    //    }
-    
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         // #warning Incomplete implementation, return the number of rows
-        return category.count
+        return category?.count ?? 1
     }
     
     
@@ -50,10 +46,9 @@ class CategoryViewController: UITableViewController {
         }
         let action  = UIAlertAction(title: "add Category", style:
         .default) { (action) in
-            let newCategory = Category(context: self.context)
-            newCategory.name = categoryTextField.text
-            self.category.append(newCategory)
-            self.saveData()
+            let newCategory = Category()
+            newCategory.name = categoryTextField.text!
+            self.save(category: newCategory)
         }
         alert.addAction(action)
         present(alert,animated: true,completion: nil)
@@ -61,15 +56,16 @@ class CategoryViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        cell.textLabel?.text = category[indexPath.item].name
-        cell.accessoryType = category[indexPath.item].done == true ? .checkmark:.none
+        cell.textLabel?.text = category?[indexPath.item].name ?? "Not Category added yet"
         return cell
     }
     
     //MARK:- SaveData
-    func saveData(){
+    func save(category:Object){
         do {
-            try context.save()
+            try realm.write{
+                realm.add(category)
+            }
             tableView.reloadData()
         } catch (let error) {
             print(error)
@@ -84,7 +80,7 @@ class CategoryViewController: UITableViewController {
         if segue.identifier == "goToItems"{
             if let ItemVC = segue.destination as? ViewController{
                 if let indexPath = tableView.indexPathForSelectedRow{
-                    ItemVC.selectedCategory = category[indexPath.item]
+                    ItemVC.selectedCategory = category?[indexPath.item]
                 }
             }
         }
@@ -93,9 +89,8 @@ class CategoryViewController: UITableViewController {
 //MARK:- SearchBar methods
 extension CategoryViewController:UISearchBarDelegate{
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        let request:NSFetchRequest<Category> = Category.fetchRequest()
-        request.predicate = NSPredicate(format: "name contains[cd] %@", searchBar.text!)
-        loadData(with: request)
+        let searchWord = searchBar.text
+        loadData(with: searchWord)
     }
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
